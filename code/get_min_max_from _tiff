@@ -1,0 +1,84 @@
+"""
+Analyze TIFF files to extract min and max values.
+Designed to run in a cartopy environment with rioxarray available.
+"""
+import numpy as np
+import rioxarray
+from pathlib import Path
+
+# Directory containing the .tiff files
+data_dir = "/Users/steffen/Nextcloud/Research/HEATWAVE/data/bgd"
+
+# Find all .tiff and .tif files
+tiff_files = sorted(Path(data_dir).glob("*.tiff")) + sorted(Path(data_dir).glob("*.tif"))
+
+print("=" * 80)
+print("TIFF File Statistics - Min and Max Values")
+print("=" * 80)
+print()
+
+results = []
+
+for tiff_file in tiff_files:
+    try:
+        # Open the raster file using rioxarray
+        data_array = rioxarray.open_rasterio(tiff_file)
+        
+        # Squeeze to remove band dimension if present
+        img = data_array.squeeze()
+        
+        # Calculate min and max, ignoring NaN values
+        min_val = float(np.nanmin(img.values))
+        max_val = float(np.nanmax(img.values))
+        
+        # Extract file info from filename
+        filename = tiff_file.name
+        # Parse: e.g., "2deg_Tw_mean_.tiff"
+        parts = filename.replace('.tiff', '').replace('.tif', '').split('_')
+        warming = parts[0]  # e.g., "2deg"
+        var = parts[1]      # e.g., "Tw" or "tas"
+        period = parts[2]   # e.g., "mean" or "3hrmax"
+        
+        results.append({
+            'filename': filename,
+            'warming': warming,
+            'var': var,
+            'period': period,
+            'min': min_val,
+            'max': max_val
+        })
+        
+        print(f"File: {filename}")
+        print(f"  Variable: {var}, Period: {period}, Warming: {warming}")
+        print(f"  Min: {min_val:.2f}°C")
+        print(f"  Max: {max_val:.2f}°C")
+        print()
+        
+    except Exception as e:
+        print(f"Error processing {tiff_file.name}: {e}")
+        import traceback
+        traceback.print_exc()
+        print()
+
+# Summary table organized by variable and period
+print("=" * 80)
+print("Summary Table")
+print("=" * 80)
+print()
+
+# Group by variable and period
+for var in ['Tw', 'tas']:
+    for period in ['mean', '3hrmax']:
+        print(f"\n{var.upper()} - {period.upper()}:")
+        print("-" * 60)
+        print(f"{'Warming':<10} {'Min (°C)':<12} {'Max (°C)':<12}")
+        print("-" * 60)
+        
+        for warming in ['2deg', '3deg', '4deg']:
+            matching = [r for r in results if r['var'] == var and r['period'] == period and r['warming'] == warming]
+            if matching:
+                r = matching[0]
+                print(f"{warming:<10} {r['min']:<12.2f} {r['max']:<12.2f}")
+
+print()
+print("=" * 80)
